@@ -11,6 +11,7 @@ interface PresidentialDuelStageProps {
   onSelectUf: (uf: UF) => void;
   hoveredUf?: UF | null;
   onHoverUf?: (uf: UF | null) => void;
+  candidates?: Candidate[];
   stats?: ElectionStats;
   isLoading?: boolean;
   onRefreshTse?: () => void;
@@ -23,13 +24,14 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
   onSelectUf,
   hoveredUf,
   onHoverUf,
+  candidates,
   stats,
   isLoading = false,
   onRefreshTse,
 }) => {
   const [nationalCandidates, setNationalCandidates] = useState<Candidate[]>([]);
 
-  // Polling a cada 5 segundos diretamente da CDN oficial do TSE para a UF ativa
+  // Polling a cada 5 segundos diretamente da CDN oficial do TSE caso candidates não seja fornecido
   useEffect(() => {
     let isMounted = true;
 
@@ -56,13 +58,18 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
     };
   }, [currentUf]);
 
+  const effectiveCandidates = useMemo(() => {
+    if (candidates && candidates.length >= 2) return candidates;
+    return nationalCandidates;
+  }, [candidates, nationalCandidates]);
+
   const candLula = useMemo(() => {
-    return nationalCandidates.find((c) => c.n === '13') || nationalCandidates[0] || null;
-  }, [nationalCandidates]);
+    return effectiveCandidates.find((c) => c.n === '13') || effectiveCandidates[0] || null;
+  }, [effectiveCandidates]);
 
   const candFlavio = useMemo(() => {
-    return nationalCandidates.find((c) => c.n === '22') || nationalCandidates[1] || null;
-  }, [nationalCandidates]);
+    return effectiveCandidates.find((c) => c.n === '22') || effectiveCandidates[1] || null;
+  }, [effectiveCandidates]);
 
   // Cálculos dinâmicos das porcentagens para o Quadro de Votos
   const totalVotosComputados = (stats?.votosValidos || 0) + (stats?.votosBrancos || 0) + (stats?.votosNulos || 0);
@@ -142,10 +149,10 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
           </div>
 
           <div className="flex items-baseline gap-2">
-            <span className="text-base sm:text-lg font-black text-[#152A57] font-mono leading-none">
+            <span className="text-base sm:text-lg font-black text-[#152A57] font-display tabular-nums leading-none">
               {formatPercentBR(stats?.pst || 0)}
             </span>
-            <span className="text-[10px] font-black tracking-widest text-[#152A57]/70 uppercase font-mono">
+            <span className="text-[10px] font-black tracking-wider text-[#152A57]/70 uppercase font-display">
               FONTE: TSE
             </span>
           </div>
@@ -155,9 +162,12 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
         {/* A. BLOCO DO DUELO: LULA E FLÁVIO NO MESMO BLOCO           */}
         {/* ======================================================== */}
         <div 
-          onClick={() => onSelectUf('BR')}
+          onClick={() => {
+            onSelectRegion?.(null);
+            onSelectUf('BR');
+          }}
           className="w-full bg-white/95 backdrop-blur-md rounded-3xl p-3 sm:p-4 shadow-xl border border-slate-200/90 flex flex-col justify-between cursor-pointer group"
-          title="Clique para sincronizar apuração nacional de Presidente"
+          title="Clique para voltar à apuração nacional de Presidente (Brasil)"
         >
           {/* Topo: Badges dos dois candidatos e 2º Turno */}
           <div className="flex items-center justify-between gap-2 mb-2.5">
@@ -166,7 +176,11 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
             </span>
             <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-lg bg-[#152A57] text-white tracking-widest inline-flex items-center gap-1.5 shadow-xs">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              {currentUf && currentUf !== 'BR' ? `2º T • ${currentUf}` : '2º TURNO'}
+              {currentUf && currentUf !== 'BR' 
+                ? `2º T • ${currentUf}` 
+                : selectedRegion 
+                ? `2º T • ${selectedRegion}` 
+                : '2º TURNO'}
             </span>
             <span className="bg-[#1A365D] text-white font-display font-black text-xs px-2.5 py-1 rounded-xl shadow-xs uppercase tracking-wider">
               {candFlavio?.partido || 'PL'} • {candFlavio?.n || '22'}
@@ -208,10 +222,10 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
               <div className="border-t border-slate-200 mt-1 pt-1.5" />
 
               {/* Porcentagem e Votos */}
-              <span className="font-display font-black text-3xl sm:text-4xl text-[#CC0000] tracking-tight leading-none block">
+              <span className="font-display font-black text-3xl sm:text-4xl text-[#CC0000] tracking-tight leading-none block tabular-nums">
                 {formatPercentBR(candLula?.pvap || 0)}
               </span>
-              <span className="text-[11px] font-bold text-[#152A57] font-mono block mt-0.5">
+              <span className="text-[11px] font-bold text-[#152A57] font-display tabular-nums block mt-0.5">
                 {formatVotesBR(candLula?.vap || 0)} votos
               </span>
 
@@ -256,10 +270,10 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
               <div className="border-t border-slate-200 mt-1 pt-1.5" />
 
               {/* Porcentagem e Votos */}
-              <span className="font-display font-black text-3xl sm:text-4xl text-[#1A365D] tracking-tight leading-none block">
+              <span className="font-display font-black text-3xl sm:text-4xl text-[#1A365D] tracking-tight leading-none block tabular-nums">
                 {formatPercentBR(candFlavio?.pvap || 0)}
               </span>
-              <span className="text-[11px] font-bold text-[#152A57] font-mono block mt-0.5">
+              <span className="text-[11px] font-bold text-[#152A57] font-display tabular-nums block mt-0.5">
                 {formatVotesBR(candFlavio?.vap || 0)} votos
               </span>
 
@@ -285,7 +299,7 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
             <h3 className="font-display font-black text-xs sm:text-sm text-[#152A57] tracking-wider uppercase">
               QUADRO DE VOTOS
             </h3>
-            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-lg bg-white border border-[#A8BED5]/60 text-[#152A57] shadow-xs font-mono">
+            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-lg bg-white border border-[#A8BED5]/60 text-[#152A57] shadow-xs font-display tracking-wider">
               OFICIAL TSE
             </span>
           </div>
@@ -300,11 +314,11 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" />
                   VOTOS VÁLIDOS
                 </span>
-                <span className="font-mono font-black text-xs sm:text-sm text-emerald-600">
+                <span className="font-display font-black text-xs sm:text-sm text-emerald-600 tabular-nums">
                   {formatPercentBR(validosPercent)}
                 </span>
               </div>
-              <div className="text-sm sm:text-base font-black text-[#152A57] font-mono mt-0.5">
+              <div className="text-sm sm:text-base font-black text-[#152A57] font-display tabular-nums mt-0.5">
                 {formatVotesBR(stats?.votosValidos || 0)}
               </div>
             </div>
@@ -316,11 +330,11 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500 flex-shrink-0" />
                   VOTOS BRANCOS
                 </span>
-                <span className="font-mono font-black text-xs sm:text-sm text-amber-600">
+                <span className="font-display font-black text-xs sm:text-sm text-amber-600 tabular-nums">
                   {formatPercentBR(brancosPercent)}
                 </span>
               </div>
-              <div className="text-sm sm:text-base font-black text-[#152A57] font-mono mt-0.5">
+              <div className="text-sm sm:text-base font-black text-[#152A57] font-display tabular-nums mt-0.5">
                 {formatVotesBR(stats?.votosBrancos || 0)}
               </div>
             </div>
@@ -332,11 +346,11 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
                   <span className="w-2.5 h-2.5 rounded-full bg-rose-500 flex-shrink-0" />
                   VOTOS NULOS
                 </span>
-                <span className="font-mono font-black text-xs sm:text-sm text-rose-600">
+                <span className="font-display font-black text-xs sm:text-sm text-rose-600 tabular-nums">
                   {formatPercentBR(nulosPercent)}
                 </span>
               </div>
-              <div className="text-sm sm:text-base font-black text-[#152A57] font-mono mt-0.5">
+              <div className="text-sm sm:text-base font-black text-[#152A57] font-display tabular-nums mt-0.5">
                 {formatVotesBR(stats?.votosNulos || 0)}
               </div>
             </div>
@@ -350,11 +364,11 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
                       <span className="w-2.5 h-2.5 rounded-full bg-slate-500 flex-shrink-0" />
                       ABSTENÇÃO OFICIAL
                     </span>
-                    <span className="font-mono font-black text-xs sm:text-sm text-slate-700">
+                    <span className="font-display font-black text-xs sm:text-sm text-slate-700 tabular-nums">
                       {formatPercentBR(abstencaoPercent)}
                     </span>
                   </div>
-                  <div className="text-sm sm:text-base font-black text-[#152A57] font-mono mt-0.5">
+                  <div className="text-sm sm:text-base font-black text-[#152A57] font-display tabular-nums mt-0.5">
                     {formatVotesBR(stats?.abstencao || 0)} eleitores
                   </div>
                 </>
@@ -369,13 +383,13 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
                       {hasVotos && liderNome ? `DIFERENÇA (${liderNome})` : 'DIFERENÇA DE VOTOS'}
                     </span>
                     <span 
-                      className="font-mono font-black text-xs sm:text-sm"
+                      className="font-display font-black text-xs sm:text-sm tabular-nums"
                       style={{ color: hasVotos && liderNome ? liderCor : '#64748B' }}
                     >
                       {hasVotos ? `+${formatPercentBR(diffPercent)}` : '0,00%'}
                     </span>
                   </div>
-                  <div className="text-sm sm:text-base font-black text-[#152A57] font-mono mt-0.5 flex items-baseline justify-between">
+                  <div className="text-sm sm:text-base font-black text-[#152A57] font-display tabular-nums mt-0.5 flex items-baseline justify-between">
                     <span>
                       {hasVotos ? `+${formatVotesBR(diffVotos)} votos` : '0 votos'}
                     </span>

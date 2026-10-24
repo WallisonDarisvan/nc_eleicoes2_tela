@@ -98,7 +98,7 @@ const GovernorGridCard: React.FC<GovernorGridCardProps> = React.memo(
         {/* Topo do Card do Estado: apenas Sigla (UF) e Tag de Status */}
         <div className="flex items-center justify-between mb-1 px-0.5">
           <span
-            className={`text-[9px] sm:text-[10px] font-mono font-black text-white px-1 py-0.5 rounded-md flex-shrink-0 transition-colors ${
+            className={`text-[9px] sm:text-[10px] font-display font-black text-white px-1 py-0.5 rounded-md flex-shrink-0 transition-colors ${
               isHovered ? 'bg-[#00838F]' : 'bg-[#152A57]'
             }`}
           >
@@ -293,10 +293,10 @@ export const MapGovernorsGridSidebar: React.FC<MapGovernorsGridSidebarProps> = (
                   <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
                     {/* Topo: Posição e Partido */}
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[10px] font-black text-white bg-[#152A57] px-1.5 py-0.5 rounded-md font-mono">
+                      <span className="text-[10px] font-black text-white bg-[#152A57] px-1.5 py-0.5 rounded-md font-display">
                         {idx + 1}º
                       </span>
-                      <span className="text-[10px] font-bold text-[#152A57] uppercase font-mono">
+                      <span className="text-[10px] font-bold text-[#152A57] uppercase font-display">
                         {cand.partido} • {cand.n}
                       </span>
                     </div>
@@ -308,7 +308,7 @@ export const MapGovernorsGridSidebar: React.FC<MapGovernorsGridSidebarProps> = (
 
                     {/* Percentual e Votos */}
                     <div className="flex items-baseline justify-between mt-1">
-                      <span className="font-display font-black text-base sm:text-xl text-[#152A57] tracking-tight">
+                      <span className="font-display font-black text-base sm:text-xl text-[#152A57] tracking-tight tabular-nums">
                         {formatPercentBR(cand.pvap)}
                       </span>
                       <span className="text-[9px] text-[#152A57]/60 font-bold uppercase">
@@ -330,7 +330,7 @@ export const MapGovernorsGridSidebar: React.FC<MapGovernorsGridSidebarProps> = (
             <h3 className="font-display font-black text-xs uppercase tracking-wider text-[#152A57] flex items-center gap-1.5">
               <span>GOVERNADORES POR ESTADO</span>
             </h3>
-            <span className="text-[10px] font-mono font-bold text-[#152A57]/70">
+            <span className="text-[10px] font-display font-bold text-[#152A57]/70">
               {filteredGovernors.length} UFs
             </span>
           </div>

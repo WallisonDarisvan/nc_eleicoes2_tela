@@ -25,8 +25,8 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Roboto Mono', 'monospace'],
+        sans: ['Outfit', 'Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ['Outfit', 'Inter', 'system-ui', 'sans-serif'],
         display: ['Outfit', 'Inter', 'sans-serif'],
       },
       boxShadow: {

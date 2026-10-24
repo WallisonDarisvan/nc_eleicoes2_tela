@@ -143,13 +143,29 @@ export function App() {
   }, [isMacroOpen]);
 
 
+  // Seleção de Região (ativa consolidação da soma dos estados daquela região)
+  const handleSelectRegion = (region: Region | null) => {
+    setSelectedRegion(region);
+    if (region) {
+      setIsRegionTotal(true);
+      setCurrentUf('BR');
+    } else {
+      setIsRegionTotal(false);
+      setCurrentUf('BR');
+    }
+  };
+
   // Seleção direta de UF (clique em qualquer estado específico ou Nacional)
   const handleSelectUf = (uf: UF) => {
-    setIsRegionTotal(false);
-    setCurrentUf(uf);
     if (uf === 'BR') {
+      setCurrentUf('BR');
       setCurrentCargo('PRESIDENTE');
+      if (!selectedRegion) {
+        setIsRegionTotal(false);
+      }
     } else {
+      setIsRegionTotal(false);
+      setCurrentUf(uf);
       // Identifica e ativa a região pertencente
       for (const [reg, ufs] of Object.entries(REGIONS_DATA)) {
         if (ufs.includes(uf)) {
@@ -190,10 +206,11 @@ export function App() {
             <PresidentialDuelStage
               currentUf={currentUf}
               selectedRegion={selectedRegion}
-              onSelectRegion={setSelectedRegion}
+              onSelectRegion={handleSelectRegion}
               hoveredUf={sharedHoveredUf}
               onHoverUf={setSharedHoveredUf}
               onSelectUf={handleSelectUf}
+              candidates={electionData.candidates}
               stats={electionData.stats}
               isLoading={isLoading}
               onRefreshTse={handleRefreshTse}

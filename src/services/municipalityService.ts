@@ -58,6 +58,37 @@ export async function fetchStateMunicipalities(uf: UF): Promise<StateMunicipalit
       }
     }
 
+    // Caso especial para Pernambuco (PE): Fernando de Noronha (2605459) fica a mais de 540km
+    // a nordeste em pleno oceano Atlântico (lat -3.86, lon -32.42), o que distorcia e achatava
+    // o continente de PE na base da tela. Nós o aproximamos da costa leste (norte de Recife)
+    // com uma escala ampliada (4x) para garantir ótima visibilidade e facilidade de clique.
+    if (uf === 'PE') {
+      const origCenterLon = -32.42785;
+      const origCenterLat = -3.8615;
+      const targetCenterLon = -34.35;
+      const targetCenterLat = -7.55;
+      const scale = 4.0;
+
+      function transformNoronha(coords: any): any {
+        if (typeof coords[0] === 'number') {
+          const [lon, lat] = coords;
+          const newLon = targetCenterLon + (lon - origCenterLon) * scale;
+          const newLat = targetCenterLat + (lat - origCenterLat) * scale;
+          return [newLon, newLat];
+        } else if (Array.isArray(coords)) {
+          return coords.map(transformNoronha);
+        }
+        return coords;
+      }
+
+      geojson.features?.forEach((f: any) => {
+        const id = String(f.properties?.codarea || f.id || '');
+        if (id === '2605459') {
+          f.geometry.coordinates = transformNoronha(f.geometry.coordinates);
+        }
+      });
+    }
+
     if (!geojson.features || geojson.features.length === 0) return null;
     geojson.features.forEach((f: any) => visitCoords(f.geometry.coordinates));
 

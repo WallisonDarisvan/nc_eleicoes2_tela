@@ -130,7 +130,7 @@ export const MapPresidentGridSidebar: React.FC<MapPresidentGridSidebarProps> = (
                       <Trophy className="w-2.5 h-2.5" />
                       2º TURNO
                     </span>
-                    <span className="text-[10px] font-black text-[#152A57] font-mono">{candA.n}</span>
+                    <span className="text-[10px] font-black text-[#152A57] font-display">{candA.n}</span>
                   </div>
 
                   <h4 className="font-display font-black text-xs sm:text-sm text-[#152A57] uppercase leading-tight truncate mt-0.5">
@@ -144,7 +144,7 @@ export const MapPresidentGridSidebar: React.FC<MapPresidentGridSidebarProps> = (
                     >
                       {formatPercentBR(candA.pvap)}
                     </div>
-                    <div className="text-[10px] font-bold text-[#152A57]/70 font-mono mt-0.5 truncate">
+                    <div className="text-[10px] font-bold text-[#152A57]/70 font-display tabular-nums mt-0.5 truncate">
                       {candA.vap > 0 ? `${formatVotesBR(candA.vap)} votos` : (candA.vice ? `Vice: ${candA.vice}` : '0 votos')}
                     </div>
                   </div>
@@ -183,7 +183,7 @@ export const MapPresidentGridSidebar: React.FC<MapPresidentGridSidebarProps> = (
                     <span className="inline-flex items-center text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-blue-600 text-white shadow-xs">
                       2º TURNO
                     </span>
-                    <span className="text-[10px] font-black text-[#152A57] font-mono">{candB.n}</span>
+                    <span className="text-[10px] font-black text-[#152A57] font-display">{candB.n}</span>
                   </div>
 
                   <h4 className="font-display font-black text-xs sm:text-sm text-[#152A57] uppercase leading-tight truncate mt-0.5">
@@ -197,7 +197,7 @@ export const MapPresidentGridSidebar: React.FC<MapPresidentGridSidebarProps> = (
                     >
                       {formatPercentBR(candB.pvap)}
                     </div>
-                    <div className="text-[10px] font-bold text-[#152A57]/70 font-mono mt-0.5 truncate">
+                    <div className="text-[10px] font-bold text-[#152A57]/70 font-display tabular-nums mt-0.5 truncate">
                       {candB.vap > 0 ? `${formatVotesBR(candB.vap)} votos` : (candB.vice ? `Vice: ${candB.vice}` : '0 votos')}
                     </div>
                   </div>
@@ -241,7 +241,7 @@ export const MapPresidentGridSidebar: React.FC<MapPresidentGridSidebarProps> = (
             <h3 className="font-display font-black text-xs uppercase tracking-wider text-[#152A57] flex items-center gap-1.5">
               <span>APURAÇÃO OFICIAL POR ESTADO (27 UFs)</span>
             </h3>
-            <span className="text-[10px] font-mono font-bold text-[#152A57]/70">
+            <span className="text-[10px] font-display font-bold text-[#152A57]/70">
               {filteredStates.length} Estados ativos
             </span>
           </div>

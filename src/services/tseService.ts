@@ -378,15 +378,114 @@ export async function fetchLiveMacroRegions(): Promise<RegionSummary[]> {
 }
 
 /**
- * Busca e consolida a apuração completa para uma região inteira
+ * Busca e consolida a apuração completa para uma região inteira somando todos os seus estados
  */
 export async function fetchLiveRegionData(
   region: Region,
   onStaleSnapshot?: (cachedData: ElectionDataPackage) => void
 ): Promise<{ success: boolean; data: ElectionDataPackage; error?: string }> {
   const ufs = REGIONS_DATA[region];
-  const firstUf = ufs[0] || 'SP';
-  return fetchLiveTseData(firstUf, 'PRESIDENTE', onStaleSnapshot);
+  const cacheKey = `PRESIDENTE-REGION-${region}`;
+  const now = Date.now();
+  const cached = tseCache.get(cacheKey);
+
+  if (cached && now - cached.timestamp < CACHE_TTL_MS) {
+    return { success: true, data: cached.data };
+  }
+
+  if (cached && onStaleSnapshot) {
+    onStaleSnapshot(cached.data);
+  }
+
+  try {
+    const results = await Promise.all(
+      ufs.map((uf) => fetchLiveTseData(uf, 'PRESIDENTE'))
+    );
+
+    let totalVotosValidos = 0;
+    let totalVotosBrancos = 0;
+    let totalVotosNulos = 0;
+    let totalAbstencao = 0;
+    let totalComparecimento = 0;
+    let totalEleitores = 0;
+    let totalSecoes = 0;
+    let secoesTotalizadas = 0;
+
+    const candMap = new Map<string, { vap: number; template: Candidate }>();
+
+    for (const res of results) {
+      if (res.success && res.data) {
+        const pkg = res.data;
+        totalVotosValidos += pkg.stats.votosValidos;
+        totalVotosBrancos += pkg.stats.votosBrancos;
+        totalVotosNulos += pkg.stats.votosNulos;
+        totalAbstencao += pkg.stats.abstencao;
+        totalComparecimento += pkg.stats.comparecimento;
+        totalEleitores += pkg.stats.totalEleitores;
+        totalSecoes += pkg.stats.totalSecoes;
+        secoesTotalizadas += pkg.stats.secoesTotalizadas;
+
+        for (const cand of pkg.candidates) {
+          const existing = candMap.get(cand.n);
+          if (existing) {
+            existing.vap += cand.vap;
+          } else {
+            candMap.set(cand.n, { vap: cand.vap, template: { ...cand } });
+          }
+        }
+      }
+    }
+
+    const consolidatedCandidates: Candidate[] = [];
+    for (const { vap, template } of candMap.values()) {
+      const pvap = totalVotosValidos > 0 ? (vap / totalVotosValidos) * 100 : 0;
+      consolidatedCandidates.push({
+        ...template,
+        vap,
+        pvap: parseFloat(pvap.toFixed(2))
+      });
+    }
+
+    consolidatedCandidates.sort((a, b) => b.vap - a.vap);
+
+    const pst = totalSecoes > 0 ? (secoesTotalizadas / totalSecoes) * 100 : 0;
+
+    const consolidatedStats: ElectionStats = {
+      secoesTotalizadas,
+      totalSecoes,
+      pst: parseFloat(pst.toFixed(2)),
+      votosValidos: totalVotosValidos,
+      votosBrancos: totalVotosBrancos,
+      votosNulos: totalVotosNulos,
+      abstencao: totalAbstencao,
+      comparecimento: totalComparecimento,
+      totalEleitores,
+      dataAtualizacao: new Date().toLocaleDateString('pt-BR'),
+      horaAtualizacao: new Date().toLocaleTimeString('pt-BR'),
+      fase: '2º TURNO',
+      ano: 2026
+    };
+
+    const pkg: ElectionDataPackage = {
+      cargo: 'PRESIDENTE',
+      uf: 'BR',
+      stats: consolidatedStats,
+      candidates: consolidatedCandidates,
+      isLive: true,
+      dataSource: 'TSE_API'
+    };
+
+    tseCache.set(cacheKey, { data: pkg, timestamp: now });
+
+    return { success: true, data: pkg };
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    if (cached) {
+      return { success: true, data: cached.data };
+    }
+    const empty = createEmptyTsePackage('BR');
+    return { success: true, data: empty, error: errorMsg };
+  }
 }
 
 /**
