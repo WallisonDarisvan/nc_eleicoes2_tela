@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ChevronRight, Loader2, MapPin } from 'lucide-react';
 import type { Cargo, Region, UF, PresidentStateSummary } from '../types/election';
 import { UFS_INFO, REGIONS_DATA } from '../data/regionsAndUfs';
 import { BRAZIL_GEO_STATES } from '../data/brazilGeoData';
-import { formatPercentBR, prefetchLiveTseData, fetchPresidentStatesSummaryList } from '../services/tseService';
-import { fetchStateMunicipalities, type StateMunicipalityData } from '../services/municipalityService';
+import { formatPercentBR, formatVotesBR, prefetchLiveTseData, fetchPresidentStatesSummaryList, prefetchLiveRegionData } from '../services/tseService';
+import { fetchStateMunicipalities, prefetchStateMunicipalities, type StateMunicipalityData, type MunicipalityCandidateDetail, type MunicipalityPath } from '../services/municipalityService';
 
 interface BrazilMapProps {
   selectedRegion?: Region | null;
@@ -66,6 +66,49 @@ const FONT_SIZES: Partial<Record<UF, number>> = {
   DF: 10,
 };
 
+interface MunicipalityPathItemProps {
+  mun: MunicipalityPath;
+  isHovered: boolean;
+  onHover: (mun: MunicipalityPath) => void;
+  onLeave: () => void;
+}
+
+// Item 1: Componente isolado e memoizado para garantir 60 FPS estáveis mesmo com >800 municípios
+const MunicipalityPathItem: React.FC<MunicipalityPathItemProps> = React.memo(({
+  mun,
+  isHovered,
+  onHover,
+  onLeave,
+}) => {
+  let munBaseColor = mun.color || '#243B5A';
+  let munHoverColor = '#00B4D8';
+
+  if (mun.leader === 'LULA') {
+    munBaseColor = '#CC0000';
+    munHoverColor = '#FF5252';
+  } else if (mun.leader === 'BOLSONARO') {
+    munBaseColor = '#12B24B';
+    munHoverColor = '#16C955';
+  } else {
+    munBaseColor = '#243B5A';
+    munHoverColor = '#32527B';
+  }
+
+  return (
+    <path
+      d={mun.d}
+      fill={isHovered ? munHoverColor : munBaseColor}
+      stroke={isHovered ? '#FFFFFF' : 'rgba(255, 255, 255, 0.45)'}
+      strokeWidth={isHovered ? 2.2 : 0.9}
+      strokeLinejoin="round"
+      filter={isHovered ? 'url(#munGlow)' : undefined}
+      className="cursor-pointer transition-colors duration-150"
+      onMouseEnter={() => onHover(mun)}
+      onMouseLeave={onLeave}
+    />
+  );
+});
+
 export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
   selectedRegion,
   selectedUf,
@@ -82,7 +125,17 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
   // Nível 3: Malha vetorial e nomes dos municípios do estado selecionado
   const [municipalityData, setMunicipalityData] = useState<StateMunicipalityData | null>(null);
   const [isLoadingMunicipalities, setIsLoadingMunicipalities] = useState<boolean>(false);
-  const [hoveredMun, setHoveredMun] = useState<{ id: string; nome: string; leader?: string; pvap?: number } | null>(null);
+  const [hoveredMun, setHoveredMun] = useState<{
+    id: string;
+    nome: string;
+    leader?: string;
+    pvap?: number;
+    vap?: number;
+    pst?: number;
+    totalValidos?: number;
+    cand1?: MunicipalityCandidateDetail;
+    cand2?: MunicipalityCandidateDetail;
+  } | null>(null);
 
   // Atualização em tempo real dos 27 estados diretamente da CDN do TSE
   useEffect(() => {
@@ -118,14 +171,19 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
   const activeSelectedUf = selectedUf && selectedUf !== 'BR' ? selectedUf : null;
   const activeRegion: Region | null = (activeSelectedUf ? UFS_INFO[activeSelectedUf]?.regiao : null) || selectedRegion || null;
 
-  // Carrega municípios quando um estado for selecionado (Nível 3)
+  // Carrega municípios quando um estado for selecionado (Nível 3) com Renderização em Duas Fases
   useEffect(() => {
     let isMounted = true;
     if (activeSelectedUf) {
       setIsLoadingMunicipalities(true);
-      fetchStateMunicipalities(activeSelectedUf).then((data) => {
+      fetchStateMunicipalities(activeSelectedUf, (initialOrUpdatedMesh) => {
         if (isMounted) {
-          setMunicipalityData(data);
+          setMunicipalityData(initialOrUpdatedMesh);
+          setIsLoadingMunicipalities(false);
+        }
+      }).then((finalData) => {
+        if (isMounted && finalData) {
+          setMunicipalityData(finalData);
           setIsLoadingMunicipalities(false);
         }
       });
@@ -138,6 +196,40 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
       isMounted = false;
     };
   }, [activeSelectedUf]);
+
+  // Item 2: Pré-carregamento cadenciado em segundo plano dos estados da região ativa
+  useEffect(() => {
+    if (activeRegion && !activeSelectedUf && REGIONS_DATA[activeRegion]) {
+      const ufsToPrefetch: UF[] = REGIONS_DATA[activeRegion];
+      const timer = setTimeout(() => {
+        ufsToPrefetch.forEach((uf: UF, index: number) => {
+          setTimeout(() => {
+            prefetchStateMunicipalities(uf);
+          }, index * 250);
+        });
+      }, 350);
+
+      return () => clearTimeout(timer);
+    }
+  }, [activeRegion, activeSelectedUf]);
+
+  const handleHoverMun = useCallback((mun: MunicipalityPath) => {
+    setHoveredMun({
+      id: mun.id,
+      nome: mun.nome,
+      leader: mun.leader === 'LULA' ? 'LULA' : mun.leader === 'BOLSONARO' ? 'FLÁVIO' : undefined,
+      pvap: mun.pvap,
+      vap: mun.vap,
+      pst: mun.pst,
+      totalValidos: mun.totalValidos,
+      cand1: mun.cand1,
+      cand2: mun.cand2,
+    });
+  }, []);
+
+  const handleLeaveMun = useCallback(() => {
+    setHoveredMun(null);
+  }, []);
 
   // Determina o nível de exibição:
   // 'national' -> Nível 1: Brasil por Regiões
@@ -227,14 +319,12 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
 
   const handleGoToRegion = (reg: Region) => {
     onSelectRegion?.(reg);
-    onSelectUf('BR');
   };
 
   // Clique em elemento no mapa
   const handleMapElementClick = (uf: UF, regionOfState: Region) => {
     if (currentLevel === 'national') {
       onSelectRegion?.(regionOfState);
-      onSelectUf('BR');
     } else if (currentLevel === 'regional') {
       onSelectUf(uf);
     }
@@ -369,46 +459,15 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
                   </filter>
                 </defs>
 
-                {municipalityData.municipalities.map((mun) => {
-                  const isHovered = hoveredMun?.id === mun.id;
-
-                  // Cor de liderança do município:
-                  // Se houver votos no município, usa cor do líder (PT #CC0000 ou PL #12B24B).
-                  // Se o estado tiver líder consolidado com apuração, os municípios herdam a cor da liderança apurada.
-                  const activeStateSummary = activeSelectedUf ? statesSummaryMap[activeSelectedUf] : null;
-                  const stateHasVotes = activeStateSummary ? (activeStateSummary.pst > 0 && activeStateSummary.leader.vap > 0) : false;
-
-                  let munBaseColor = '#243B5A';
-                  let munHoverColor = '#00B4D8';
-
-                  if (mun.leader === 'LULA' || (!mun.leader && stateHasVotes && (activeStateSummary?.leader.n === '13' || activeStateSummary?.leader.partido === 'PT'))) {
-                    munBaseColor = '#CC0000';
-                    munHoverColor = '#FF5252';
-                  } else if (mun.leader === 'BOLSONARO' || (!mun.leader && stateHasVotes && (activeStateSummary?.leader.n === '22' || activeStateSummary?.leader.partido === 'PL'))) {
-                    munBaseColor = '#12B24B';
-                    munHoverColor = '#16C955';
-                  }
-
-                  return (
-                    <path
-                      key={mun.id}
-                      d={mun.d}
-                      fill={isHovered ? munHoverColor : munBaseColor}
-                      stroke={isHovered ? '#FFFFFF' : 'rgba(255, 255, 255, 0.45)'}
-                      strokeWidth={isHovered ? 2.2 : 0.9}
-                      strokeLinejoin="round"
-                      filter={isHovered ? 'url(#munGlow)' : 'url(#munShadow)'}
-                      className="cursor-pointer transition-colors duration-150"
-                      onMouseEnter={() => setHoveredMun({ 
-                        id: mun.id, 
-                        nome: mun.nome,
-                        leader: mun.leader || (stateHasVotes ? activeStateSummary?.leader.nm : undefined),
-                        pvap: mun.pvap || (stateHasVotes ? activeStateSummary?.leader.pvap : undefined)
-                      })}
-                      onMouseLeave={() => setHoveredMun(null)}
-                    />
-                  );
-                })}
+                {municipalityData.municipalities.map((mun) => (
+                  <MunicipalityPathItem
+                    key={mun.id}
+                    mun={mun}
+                    isHovered={hoveredMun?.id === mun.id}
+                    onHover={handleHoverMun}
+                    onLeave={handleLeaveMun}
+                  />
+                ))}
 
                 {/* Inset cartográfico e legenda para Fernando de Noronha em Pernambuco */}
                 {activeSelectedUf === 'PE' && (
@@ -442,7 +501,7 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
 
               {/* Card flutuante do município sob o cursor no canto inferior direito */}
               {hoveredMun && (
-                <div className="absolute bottom-4 right-4 sm:bottom-5 sm:right-5 bg-[#152A57]/95 text-white px-4 py-2.5 rounded-2xl backdrop-blur-md border border-cyan-400/80 shadow-2xl z-30 pointer-events-none flex flex-col items-start gap-1 animate-in fade-in zoom-in-95 duration-150 min-w-[220px] max-w-[280px]">
+                <div className="absolute bottom-4 right-4 sm:bottom-5 sm:right-5 bg-[#152A57]/95 text-white px-4 py-2.5 rounded-2xl backdrop-blur-md border border-cyan-400/80 shadow-2xl z-30 pointer-events-none flex flex-col items-start gap-1.5 animate-in fade-in zoom-in-95 duration-150 min-w-[230px] max-w-[300px]">
                   <div className="w-full flex items-center justify-between gap-2 border-b border-white/10 pb-1 mb-0.5">
                     <div className="flex items-center gap-1.5 truncate">
                       <MapPin className="w-3.5 h-3.5 text-cyan-300 flex-shrink-0" />
@@ -454,25 +513,79 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
                       {activeSelectedUf}
                     </span>
                   </div>
-                  <div className="text-[11px] text-cyan-200 font-display tabular-nums font-bold flex items-center gap-1.5">
-                    {hoveredMun.leader ? (
-                      <>
-                        <span
-                          className="w-2 h-2 rounded-full flex-shrink-0"
-                          style={{
-                            backgroundColor:
-                              hoveredMun.leader === 'LULA' || hoveredMun.leader?.includes('LULA')
-                                ? '#CC0000'
-                                : '#12B24B',
-                          }}
-                        />
-                        <span>{hoveredMun.leader}:</span>
-                        <span className="text-white font-black">{formatPercentBR(hoveredMun.pvap || 0)}</span>
-                      </>
-                    ) : (
-                      <span className="text-[10px] text-slate-300">0,00% APURADO • AGUARDANDO TSE</span>
-                    )}
-                  </div>
+
+                  {hoveredMun.cand1 ? (
+                    <div className="w-full flex flex-col gap-1 text-[11px] font-display tabular-nums">
+                      {/* Candidato Líder / 1º Lugar */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: hoveredMun.cand1.color }}
+                          />
+                          <span className="font-bold text-white uppercase">{hoveredMun.cand1.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <span className="text-white font-black">{formatPercentBR(hoveredMun.cand1.pvap)}</span>
+                          <span className="text-[10px] text-slate-300 font-normal">
+                            ({formatVotesBR(hoveredMun.cand1.vap)})
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Candidato 2º Lugar */}
+                      {hoveredMun.cand2 && (
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span
+                              className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: hoveredMun.cand2.color }}
+                            />
+                            <span className="font-bold text-slate-200 uppercase">{hoveredMun.cand2.name}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <span className="text-slate-200 font-black">{formatPercentBR(hoveredMun.cand2.pvap)}</span>
+                            <span className="text-[10px] text-slate-400 font-normal">
+                              ({formatVotesBR(hoveredMun.cand2.vap)})
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Informações de Apuração e Total de Votos Válidos */}
+                      <div className="w-full border-t border-white/10 pt-1 mt-0.5 flex items-center justify-between text-[10px] text-cyan-200/80">
+                        <span>Apurado: {formatPercentBR(hoveredMun.pst || 0)}</span>
+                        {hoveredMun.totalValidos !== undefined && (
+                          <span>Válidos: {formatVotesBR(hoveredMun.totalValidos)}</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : hoveredMun.leader ? (
+                    <div className="text-[11px] text-cyan-200 font-display tabular-nums font-bold flex items-center gap-1.5 flex-wrap">
+                      <span
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{
+                          backgroundColor:
+                            hoveredMun.leader === 'LULA' || hoveredMun.leader?.includes('LULA')
+                              ? '#CC0000'
+                              : '#12B24B',
+                        }}
+                      />
+                      <span>{hoveredMun.leader}:</span>
+                      <span className="text-white font-black">{formatPercentBR(hoveredMun.pvap || 0)}</span>
+                      {hoveredMun.vap !== undefined && hoveredMun.vap > 0 && (
+                        <span className="text-[10px] text-slate-300 font-normal">
+                          ({formatVotesBR(hoveredMun.vap)} votos)
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-slate-300">
+                      {hoveredMun.pst !== undefined && hoveredMun.pst > 0
+                        ? `${formatPercentBR(hoveredMun.pst)} APURADO • EMPATE`
+                        : '0,00% APURADO • AGUARDANDO TSE'}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -588,6 +701,10 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
                       setInternalHoveredRegion(geo.region);
                       onHoverUf?.(uf);
                       prefetchLiveTseData(uf, currentCargo);
+                      // Pré-carrega a malha e votos dos municípios em segundo plano ao passar o mouse no Nível 2
+                      if (currentLevel === 'regional') {
+                        prefetchStateMunicipalities(uf);
+                      }
                     }}
                     onMouseLeave={() => {
                       if (isOtherRegion) return;
@@ -651,7 +768,7 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
 
             {/* NÍVEL 1: RÓTULOS E BADGES DAS 5 MACRORREGIÕES NO MAPA COMPLETO */}
             {currentLevel === 'national' && (
-              <g className="pointer-events-none">
+              <g>
                 {(Object.keys(REGION_CENTERS) as Region[]).map((reg) => {
                   const center = REGION_CENTERS[reg];
                   const isHovered = effectiveHoveredRegion === reg;
@@ -676,7 +793,13 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
                   return (
                     <g
                       key={`region-badge-${reg}`}
-                      className="transition-transform duration-200"
+                      className="transition-transform duration-200 cursor-pointer pointer-events-auto"
+                      onClick={() => onSelectRegion?.(reg)}
+                      onMouseEnter={() => {
+                        setInternalHoveredRegion(reg);
+                        prefetchLiveRegionData(reg);
+                      }}
+                      onMouseLeave={() => setInternalHoveredRegion(null)}
                       style={{
                         transform: isHovered ? 'scale(1.08)' : 'scale(1)',
                         transformOrigin: `${center.x}px ${center.y}px`,

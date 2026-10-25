@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { RotateCw, Radio } from 'lucide-react';
 import type { Candidate, ElectionStats, Region, UF } from '../types/election';
 import { BrazilMap } from './BrazilMap';
-import { formatPercentBR, formatVotesBR, fetchLiveTseData } from '../services/tseService';
+import { formatPercentBR, formatVotesBR } from '../services/tseService';
 
 interface PresidentialDuelStageProps {
   currentUf?: UF;
@@ -29,39 +29,9 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
   isLoading = false,
   onRefreshTse,
 }) => {
-  const [nationalCandidates, setNationalCandidates] = useState<Candidate[]>([]);
-
-  // Polling a cada 5 segundos diretamente da CDN oficial do TSE caso candidates não seja fornecido
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadData = async () => {
-      try {
-        const natRes = await fetchLiveTseData(currentUf || 'BR', 'PRESIDENTE');
-
-        if (isMounted) {
-          if (natRes.success && natRes.data) {
-            setNationalCandidates(natRes.data.candidates);
-          }
-        }
-      } catch {
-        // Silencioso para polling contínuo
-      }
-    };
-
-    loadData();
-    const interval = setInterval(loadData, 5000); // 5 segundos
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [currentUf]);
-
   const effectiveCandidates = useMemo(() => {
-    if (candidates && candidates.length >= 2) return candidates;
-    return nationalCandidates;
-  }, [candidates, nationalCandidates]);
+    return candidates && candidates.length > 0 ? candidates : [];
+  }, [candidates]);
 
   const candLula = useMemo(() => {
     return effectiveCandidates.find((c) => c.n === '13') || effectiveCandidates[0] || null;

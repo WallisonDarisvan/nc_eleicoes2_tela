@@ -489,12 +489,122 @@ export async function fetchLiveRegionData(
 }
 
 /**
- * Prefetch para região inteira em hover
+ * Consolida imediatamente os dados da região a partir dos estados já presentes no cache em memória
+ */
+export function consolidateRegionFromMemory(region: Region): ElectionDataPackage | null {
+  const ufs = REGIONS_DATA[region];
+  if (!ufs || ufs.length === 0) return null;
+
+  let totalVotosValidos = 0;
+  let totalVotosBrancos = 0;
+  let totalVotosNulos = 0;
+  let totalAbstencao = 0;
+  let totalComparecimento = 0;
+  let totalEleitores = 0;
+  let totalSecoes = 0;
+  let secoesTotalizadas = 0;
+
+  const candMap = new Map<string, { vap: number; template: Candidate }>();
+  let hasAtLeastOne = false;
+
+  for (const uf of ufs) {
+    const cached = tseCache.get(`PRESIDENTE-${uf}`);
+    if (cached && cached.data) {
+      hasAtLeastOne = true;
+      const pkg = cached.data;
+      totalVotosValidos += pkg.stats.votosValidos;
+      totalVotosBrancos += pkg.stats.votosBrancos;
+      totalVotosNulos += pkg.stats.votosNulos;
+      totalAbstencao += pkg.stats.abstencao;
+      totalComparecimento += pkg.stats.comparecimento;
+      totalEleitores += pkg.stats.totalEleitores;
+      totalSecoes += pkg.stats.totalSecoes;
+      secoesTotalizadas += pkg.stats.secoesTotalizadas;
+
+      for (const cand of pkg.candidates) {
+        const existing = candMap.get(cand.n);
+        if (existing) {
+          existing.vap += cand.vap;
+        } else {
+          candMap.set(cand.n, { vap: cand.vap, template: { ...cand } });
+        }
+      }
+    }
+  }
+
+  if (!hasAtLeastOne) return null;
+
+  const consolidatedCandidates: Candidate[] = [];
+  for (const { vap, template } of candMap.values()) {
+    const pvap = totalVotosValidos > 0 ? (vap / totalVotosValidos) * 100 : 0;
+    consolidatedCandidates.push({
+      ...template,
+      vap,
+      pvap: parseFloat(pvap.toFixed(2))
+    });
+  }
+  consolidatedCandidates.sort((a, b) => b.vap - a.vap);
+
+  const pst = totalSecoes > 0 ? (secoesTotalizadas / totalSecoes) * 100 : 0;
+
+  const consolidatedStats: ElectionStats = {
+    secoesTotalizadas,
+    totalSecoes,
+    pst: parseFloat(pst.toFixed(2)),
+    votosValidos: totalVotosValidos,
+    votosBrancos: totalVotosBrancos,
+    votosNulos: totalVotosNulos,
+    abstencao: totalAbstencao,
+    comparecimento: totalComparecimento,
+    totalEleitores,
+    dataAtualizacao: new Date().toLocaleDateString('pt-BR'),
+    horaAtualizacao: new Date().toLocaleTimeString('pt-BR'),
+    fase: '2º TURNO',
+    ano: 2026
+  };
+
+  const pkg: ElectionDataPackage = {
+    cargo: 'PRESIDENTE',
+    uf: 'BR',
+    stats: consolidatedStats,
+    candidates: consolidatedCandidates,
+    isLive: true,
+    dataSource: 'TSE_API'
+  };
+
+  const cacheKey = `PRESIDENTE-REGION-${region}`;
+  tseCache.set(cacheKey, { data: pkg, timestamp: Date.now() });
+
+  return pkg;
+}
+
+/**
+ * Retorna os dados da região salvos em memória para transição instantânea (0ms e sem oscilações)
+ */
+export function getCachedRegionData(region: Region): ElectionDataPackage | null {
+  const cacheKey = `PRESIDENTE-REGION-${region}`;
+  const cached = tseCache.get(cacheKey);
+  if (cached) return cached.data;
+  return consolidateRegionFromMemory(region);
+}
+
+/**
+ * Retorna os dados nacionais de Presidente salvos em memória
+ */
+export function getCachedNationalData(): ElectionDataPackage | null {
+  const cached = tseCache.get('PRESIDENTE-BR');
+  return cached ? cached.data : null;
+}
+
+/**
+ * Prefetch cadenciado para todos os estados da região inteira
  */
 export function prefetchLiveRegionData(region: Region): void {
   const ufs = REGIONS_DATA[region];
-  if (ufs[0]) {
-    prefetchLiveTseData(ufs[0], 'PRESIDENTE');
+  if (Array.isArray(ufs)) {
+    ufs.forEach((uf) => {
+      prefetchLiveTseData(uf, 'PRESIDENTE');
+    });
   }
 }
 

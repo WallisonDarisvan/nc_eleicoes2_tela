@@ -197,6 +197,36 @@ export async function saveElectionSnapshotToDb(key: string, data: ElectionDataPa
  * Recupera um snapshot de dados eleitorais salvo no IndexedDB
  */
 export async function getElectionSnapshotFromDb(key: string): Promise<ElectionDataPackage | null> {
+  return getGenericDataFromDb<ElectionDataPackage>(key);
+}
+
+/**
+ * Salva qualquer estrutura de dados ou malha estática no IndexedDB
+ */
+export async function saveGenericDataToDb(key: string, data: any): Promise<void> {
+  try {
+    const db = await openStorageDb();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(DATA_STORE, 'readwrite');
+      const store = transaction.objectStore(DATA_STORE);
+      const record = {
+        key,
+        data,
+        timestamp: Date.now(),
+      };
+      const request = store.put(record);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch {
+    // Falha silenciosa
+  }
+}
+
+/**
+ * Recupera qualquer estrutura de dados ou malha estática do IndexedDB
+ */
+export async function getGenericDataFromDb<T>(key: string): Promise<T | null> {
   try {
     const db = await openStorageDb();
     return new Promise((resolve) => {
@@ -206,7 +236,7 @@ export async function getElectionSnapshotFromDb(key: string): Promise<ElectionDa
 
       request.onsuccess = () => {
         if (request.result && request.result.data) {
-          resolve(request.result.data);
+          resolve(request.result.data as T);
         } else {
           resolve(null);
         }

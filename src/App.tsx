@@ -3,7 +3,9 @@ import type { Cargo, ElectionDataPackage, Region, RegionSummary, UF } from './ty
 import { 
   fetchLiveTseData, 
   fetchLiveRegionData,
-  fetchLiveMacroRegions 
+  fetchLiveMacroRegions,
+  getCachedRegionData,
+  getCachedNationalData,
 } from './services/tseService';
 import { getOfficialTsePackage } from './data/officialTsePresidentialData';
 import { CandidateList } from './components/CandidateList';
@@ -78,18 +80,13 @@ export function App() {
 
   // Carrega dados consolidados da região inteira somando todos os seus estados
   const loadOfficialRegionData = useCallback(async (region: Region, showToast = false) => {
-    setIsLoading(true);
     if (showToast) {
+      setIsLoading(true);
       setToastMessage(`Consolidando dados da Região ${region} via TSE...`);
     }
 
     try {
-      const onStaleSnapshot = (staleData: ElectionDataPackage) => {
-        setElectionData(staleData);
-        setIsLoading(false);
-      };
-
-      const result = await fetchLiveRegionData(region, onStaleSnapshot);
+      const result = await fetchLiveRegionData(region);
       if (result.success && result.data) {
         setElectionData(result.data);
         if (showToast) {
@@ -105,7 +102,9 @@ export function App() {
     } catch {
       // Ignora erro de rede temporário
     } finally {
-      setIsLoading(false);
+      if (showToast) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
@@ -143,15 +142,23 @@ export function App() {
   }, [isMacroOpen]);
 
 
-  // Seleção de Região (ativa consolidação da soma dos estados daquela região)
+  // Seleção de Região (ativa consolidação da soma dos estados daquela região de forma imediata e atômica)
   const handleSelectRegion = (region: Region | null) => {
     setSelectedRegion(region);
     if (region) {
       setIsRegionTotal(true);
       setCurrentUf('BR');
+      const immediate = getCachedRegionData(region);
+      if (immediate) {
+        setElectionData(immediate);
+      }
     } else {
       setIsRegionTotal(false);
       setCurrentUf('BR');
+      const national = getCachedNationalData();
+      if (national) {
+        setElectionData(national);
+      }
     }
   };
 
@@ -160,9 +167,8 @@ export function App() {
     if (uf === 'BR') {
       setCurrentUf('BR');
       setCurrentCargo('PRESIDENTE');
-      if (!selectedRegion) {
-        setIsRegionTotal(false);
-      }
+      setSelectedRegion(null);
+      setIsRegionTotal(false);
     } else {
       setIsRegionTotal(false);
       setCurrentUf(uf);
