@@ -16,7 +16,7 @@ export const OFFICIAL_TSE_2026_CONFIG = {
 
 export const PARTIDO_COLORS: Record<string, string> = {
   'PT': '#CC0000',
-  'PL': '#1A365D',
+  'PL': '#12B24B',
   'REPUBLICANOS': '#2C5282',
   'UNIÃO': '#2B6CB0',
   'NOVO': '#DD6B20',

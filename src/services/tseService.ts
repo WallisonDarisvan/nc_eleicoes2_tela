@@ -302,7 +302,7 @@ function parseTsePayload(
           const viceNome = c.vs?.[0]?.nmu || c.vs?.[0]?.nm || undefined;
 
           // Cor do candidato
-          const cor = c.n === '13' ? '#CC0000' : c.n === '22' ? '#1A365D' : (PARTIDO_COLORS[partido] || '#152A57');
+          const cor = c.n === '13' ? '#CC0000' : c.n === '22' ? '#12B24B' : (PARTIDO_COLORS[partido] || '#152A57');
 
           candidatesList.push({
             n: c.n,

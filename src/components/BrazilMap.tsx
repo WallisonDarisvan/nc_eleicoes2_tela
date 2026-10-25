@@ -160,7 +160,7 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
   // ========================================================
   // CÁLCULO DE LIDERANÇA POR REGIÃO (NÍVEL 1)
   // Lula (PT • 13) -> Vermelho (#CC0000)
-  // Flávio Bolsonaro (PL • 22) -> Azul (#1A365D / #1D4ED8)
+  // Flávio Bolsonaro (PL • 22) -> Verde (#12B24B / #16C955)
   // Sem apuração -> Neutro (#243B5A)
   // ========================================================
   const regionLeaders = useMemo(() => {
@@ -206,8 +206,8 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
         } else {
           map[reg] = {
             leader: 'BOLSONARO',
-            color: '#1A365D',
-            hoverColor: '#1D4ED8',
+            color: '#12B24B',
+            hoverColor: '#16C955',
             lulaVap: sumLula,
             bolsonaroVap: sumBolsonaro,
             totalVap: total,
@@ -327,7 +327,7 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
           <span>Lula (PT)</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#1A365D] border border-blue-400 shadow-sm" />
+          <span className="w-2.5 h-2.5 rounded-full bg-[#12B24B] border border-emerald-300 shadow-sm" />
           <span>Flávio Bolsonaro (PL)</span>
         </div>
         <div className="flex items-center gap-1.5 text-slate-400">
@@ -373,7 +373,7 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
                   const isHovered = hoveredMun?.id === mun.id;
 
                   // Cor de liderança do município:
-                  // Se houver votos no município, usa cor do líder (PT #CC0000 ou PL #1A365D).
+                  // Se houver votos no município, usa cor do líder (PT #CC0000 ou PL #12B24B).
                   // Se o estado tiver líder consolidado com apuração, os municípios herdam a cor da liderança apurada.
                   const activeStateSummary = activeSelectedUf ? statesSummaryMap[activeSelectedUf] : null;
                   const stateHasVotes = activeStateSummary ? (activeStateSummary.pst > 0 && activeStateSummary.leader.vap > 0) : false;
@@ -385,8 +385,8 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
                     munBaseColor = '#CC0000';
                     munHoverColor = '#FF5252';
                   } else if (mun.leader === 'BOLSONARO' || (!mun.leader && stateHasVotes && (activeStateSummary?.leader.n === '22' || activeStateSummary?.leader.partido === 'PL'))) {
-                    munBaseColor = '#1A365D';
-                    munHoverColor = '#2563EB';
+                    munBaseColor = '#12B24B';
+                    munHoverColor = '#16C955';
                   }
 
                   return (
@@ -463,7 +463,7 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
                             backgroundColor:
                               hoveredMun.leader === 'LULA' || hoveredMun.leader?.includes('LULA')
                                 ? '#CC0000'
-                                : '#1A365D',
+                                : '#12B24B',
                           }}
                         />
                         <span>{hoveredMun.leader}:</span>
@@ -521,7 +521,7 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
                 const hasVotes = stateSummary ? stateSummary.pst > 0 && stateSummary.leader.vap > 0 : false;
 
                 // Identifica a cor do candidato líder no estado:
-                // Lula (PT • 13) -> #CC0000 | Flávio Bolsonaro (PL • 22) -> #1A365D
+                // Lula (PT • 13) -> #CC0000 | Flávio Bolsonaro (PL • 22) -> #12B24B
                 let stateLeaderBaseColor = '#243B5A';
                 let stateLeaderHoverColor = '#32527B';
 
@@ -530,8 +530,8 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
                     stateLeaderBaseColor = '#CC0000';
                     stateLeaderHoverColor = '#E53935';
                   } else if (stateSummary.leader.n === '22' || stateSummary.leader.partido === 'PL') {
-                    stateLeaderBaseColor = '#1A365D';
-                    stateLeaderHoverColor = '#2563EB';
+                    stateLeaderBaseColor = '#12B24B';
+                    stateLeaderHoverColor = '#16C955';
                   } else {
                     stateLeaderBaseColor = stateSummary.leader.cor || '#1E3A8A';
                     stateLeaderHoverColor = '#00B4D8';
@@ -658,13 +658,13 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
                   const ufsOfRegion = REGIONS_DATA[reg];
                   const regData = regionLeaders[reg];
 
-                  // Cor do badge da região: adota a cor do líder (PT #CC0000, PL #1A365D ou #152A57)
+                  // Cor do badge da região: adota a cor do líder (PT #CC0000, PL #12B24B ou #152A57)
                   const badgeFill = isHovered 
                     ? '#00E5FF' 
                     : regData.leader === 'LULA' 
                     ? '#B71C1C' 
                     : regData.leader === 'BOLSONARO' 
-                    ? '#1A365D' 
+                    ? '#12B24B' 
                     : '#152A57';
 
                   const badgeTextSub = regData.leader === 'LULA' 
@@ -754,7 +754,7 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
                     <span
                       className="w-2 h-2 rounded-full flex-shrink-0"
                       style={{
-                        backgroundColor: leaderIsLula ? '#CC0000' : '#1A365D',
+                        backgroundColor: leaderIsLula ? '#CC0000' : '#12B24B',
                       }}
                     />
                     <span>{leader.nm}:</span>

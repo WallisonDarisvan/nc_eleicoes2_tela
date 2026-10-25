@@ -101,7 +101,7 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
   const hasVotos = lulaVap > 0 || flavioVap > 0;
 
   const liderNome = isLulaLider ? 'LULA' : isFlavioLider ? 'FLÁVIO' : '';
-  const liderCor = isLulaLider ? '#CC0000' : isFlavioLider ? '#1A365D' : '#64748B';
+  const liderCor = isLulaLider ? '#CC0000' : isFlavioLider ? '#12B24B' : '#64748B';
 
   // Verifica se a apuração atingiu 100% das urnas
   const isApuracaoCompleta = (stats?.pst || 0) >= 100;
@@ -182,7 +182,7 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
                 ? `2º T • ${selectedRegion}` 
                 : '2º TURNO'}
             </span>
-            <span className="bg-[#1A365D] text-white font-display font-black text-xs px-2.5 py-1 rounded-xl shadow-xs uppercase tracking-wider">
+            <span className="bg-[#12B24B] text-white font-display font-black text-xs px-2.5 py-1 rounded-xl shadow-xs uppercase tracking-wider">
               {candFlavio?.partido || 'PL'} • {candFlavio?.n || '22'}
             </span>
           </div>
@@ -241,7 +241,7 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
             {/* Coluna Flávio Bolsonaro */}
             <div className="flex flex-col">
               {/* Foto do Candidato */}
-              <div className="w-full aspect-[4/4.4] rounded-2xl overflow-hidden bg-[#DDE6F0] border-2 border-[#1A365D] shadow-sm relative">
+              <div className="w-full aspect-[4/4.4] rounded-2xl overflow-hidden bg-[#DDE6F0] border-2 border-[#12B24B] shadow-sm relative">
                 {candFlavio?.avatar ? (
                   <img
                     src={candFlavio.avatar}
@@ -270,7 +270,7 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
               <div className="border-t border-slate-200 mt-1 pt-1.5" />
 
               {/* Porcentagem e Votos */}
-              <span className="font-display font-black text-3xl sm:text-4xl text-[#1A365D] tracking-tight leading-none block tabular-nums">
+              <span className="font-display font-black text-3xl sm:text-4xl text-[#12B24B] tracking-tight leading-none block tabular-nums">
                 {formatPercentBR(candFlavio?.pvap || 0)}
               </span>
               <span className="text-[11px] font-bold text-[#152A57] font-display tabular-nums block mt-0.5">
@@ -280,7 +280,7 @@ export const PresidentialDuelStage: React.FC<PresidentialDuelStageProps> = ({
               {/* Barra de Progresso */}
               <div className="w-full h-1.5 rounded-full overflow-hidden bg-slate-200 mt-1.5">
                 <div 
-                  className="h-full bg-[#1A365D] transition-all duration-500 rounded-full"
+                  className="h-full bg-[#12B24B] transition-all duration-500 rounded-full"
                   style={{ width: `${candFlavio?.pvap || 0}%` }}
                 />
               </div>

@@ -221,7 +221,7 @@ export const MapPresidentGridSidebar: React.FC<MapPresidentGridSidebarProps> = (
                 />
                 <div 
                   className="h-full transition-all duration-500" 
-                  style={{ width: `${candB.pvap}%`, backgroundColor: candB.cor || '#1A365D' }}
+                  style={{ width: `${candB.pvap}%`, backgroundColor: candB.cor || '#12B24B' }}
                   title={`${candB.nm}: ${formatPercentBR(candB.pvap)}`}
                 />
               </>
@@ -279,7 +279,7 @@ export const MapPresidentGridSidebar: React.FC<MapPresidentGridSidebarProps> = (
                     ? 'text-white shadow-xs'
                     : 'text-[#152A57] hover:bg-white'
                 }`}
-                style={filterMode === candB.partido ? { backgroundColor: candB.cor || '#1A365D' } : {}}
+                style={filterMode === candB.partido ? { backgroundColor: candB.cor || '#12B24B' } : {}}
               >
                 {candB.nm.split(' ')[0]} ({candB.partido})
               </button>
