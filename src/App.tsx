@@ -7,6 +7,7 @@ import {
   getCachedRegionData,
   getCachedNationalData,
 } from './services/tseService';
+import { getElectionSnapshotFromDb } from './services/imageDbService';
 import { getOfficialTsePackage } from './data/officialTsePresidentialData';
 import { CandidateList } from './components/CandidateList';
 import { PresidentialDuelStage } from './components/PresidentialDuelStage';
@@ -62,7 +63,7 @@ export function App() {
       };
 
       const result = await fetchLiveTseData(uf, cargo, onStaleSnapshot);
-      if (result.success && result.data) {
+      if (result.success && result.data && result.data.candidates.length > 0) {
         setElectionData(result.data);
         if (showToast) {
           setToastMessage(`✅ Dados oficiais do TSE sincronizados às ${result.data.stats.horaAtualizacao}!`);
@@ -87,7 +88,7 @@ export function App() {
 
     try {
       const result = await fetchLiveRegionData(region);
-      if (result.success && result.data) {
+      if (result.success && result.data && result.data.candidates.length > 0) {
         setElectionData(result.data);
         if (showToast) {
           setToastMessage(`✅ Total consolidado da Região ${region} sincronizado!`);
@@ -106,6 +107,15 @@ export function App() {
         setIsLoading(false);
       }
     }
+  }, []);
+
+  // Carrega imediatamente o último snapshot salvo no IndexedDB (0ms) garantindo que a tela nunca abra vazia
+  useEffect(() => {
+    getElectionSnapshotFromDb('PRESIDENTE-BR').then((saved) => {
+      if (saved && saved.candidates && saved.candidates.length > 0) {
+        setElectionData(saved);
+      }
+    }).catch(() => {});
   }, []);
 
   // Calibra em segundo plano o status oficial nacional de Presidente (para garantir regras de 2º turno em estados/regiões)

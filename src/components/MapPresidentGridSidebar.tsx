@@ -10,6 +10,7 @@ import {
   fetchLiveTseData, 
   fetchPresidentStatesSummaryList 
 } from '../services/tseService';
+import { getGenericDataFromDb, getElectionSnapshotFromDb } from '../services/imageDbService';
 
 interface MapPresidentGridSidebarProps {
   onSelectUf: (uf: UF) => void;
@@ -28,9 +29,23 @@ export const MapPresidentGridSidebar: React.FC<MapPresidentGridSidebarProps> = (
   const [nationalCandidates, setNationalCandidates] = useState<Candidate[]>([]);
   const [nationalPst, setNationalPst] = useState<number>(0);
 
-  // Carrega e atualiza a cada 1 segundo dados reais e oficiais diretamente da CDN do TSE
+  // Carrega e atualiza a cada 5 segundos dados reais e oficiais diretamente da CDN do TSE com suporte offline
   useEffect(() => {
     let isMounted = true;
+
+    // Inicialização instantânea do snapshot salvo no IndexedDB se existir (0ms)
+    getGenericDataFromDb<PresidentStateSummary[]>('tse_president_states_summary_v1').then((saved) => {
+      if (isMounted && saved && saved.length > 0) {
+        setStatesList((prev) => (prev.length === 0 ? saved : prev));
+      }
+    }).catch(() => {});
+
+    getElectionSnapshotFromDb('PRESIDENTE-BR').then((saved) => {
+      if (isMounted && saved && saved.candidates && saved.candidates.length > 0) {
+        setNationalCandidates((prev) => (prev.length === 0 ? saved.candidates : prev));
+        setNationalPst((prev) => (prev === 0 ? saved.stats.pst : prev));
+      }
+    }).catch(() => {});
 
     const loadData = async () => {
       try {

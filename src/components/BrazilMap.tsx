@@ -5,6 +5,7 @@ import { UFS_INFO, REGIONS_DATA } from '../data/regionsAndUfs';
 import { BRAZIL_GEO_STATES } from '../data/brazilGeoData';
 import { formatPercentBR, formatVotesBR, prefetchLiveTseData, fetchPresidentStatesSummaryList, prefetchLiveRegionData } from '../services/tseService';
 import { fetchStateMunicipalities, prefetchStateMunicipalities, type StateMunicipalityData, type MunicipalityCandidateDetail, type MunicipalityPath } from '../services/municipalityService';
+import { getGenericDataFromDb } from '../services/imageDbService';
 
 interface BrazilMapProps {
   selectedRegion?: Region | null;
@@ -137,9 +138,21 @@ export const BrazilMap: React.FC<BrazilMapProps> = React.memo(({
     cand2?: MunicipalityCandidateDetail;
   } | null>(null);
 
-  // Atualização em tempo real dos 27 estados diretamente da CDN do TSE
+  // Atualização em tempo real dos 27 estados diretamente da CDN do TSE com suporte offline
   useEffect(() => {
     let isMounted = true;
+
+    // Carrega imediatamente snapshot salvo no IndexedDB se disponível (0ms)
+    getGenericDataFromDb<PresidentStateSummary[]>('tse_president_states_summary_v1').then((saved) => {
+      if (isMounted && saved && saved.length > 0) {
+        const map: Partial<Record<UF, PresidentStateSummary>> = {};
+        saved.forEach((s) => {
+          map[s.uf] = s;
+        });
+        setStatesSummaryMap((prev) => (Object.keys(prev).length === 0 ? map : prev));
+      }
+    }).catch(() => {});
+
     const updateStates = async () => {
       try {
         const list = await fetchPresidentStatesSummaryList();

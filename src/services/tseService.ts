@@ -18,7 +18,9 @@ import {
 import { 
   getElectionSnapshotFromDb, 
   saveElectionSnapshotToDb, 
-  preloadTopCandidatePhotos 
+  preloadTopCandidatePhotos,
+  saveGenericDataToDb,
+  getGenericDataFromDb
 } from './imageDbService';
 
 export interface TseJsonCandidate {
@@ -198,9 +200,16 @@ export async function fetchLiveTseData(
       }
 
       // Se o TSE respondeu 304 Not Modified, o arquivo não mudou
-      if (response.status === 304 && cached) {
-        cached.timestamp = now;
-        return { success: true, data: cached.data };
+      if (response.status === 304) {
+        if (cached) {
+          cached.timestamp = now;
+          return { success: true, data: cached.data };
+        }
+        const dbSnapshot = await getElectionSnapshotFromDb(cacheKey);
+        if (dbSnapshot && dbSnapshot.candidates && dbSnapshot.candidates.length > 0) {
+          tseCache.set(cacheKey, { data: dbSnapshot, timestamp: now });
+          return { success: true, data: dbSnapshot };
+        }
       }
 
       if (!response.ok) {
@@ -230,9 +239,18 @@ export async function fetchLiveTseData(
         data: parsedData
       };
     } catch {
-      // Se a conexão falhar ou o arquivo ainda estiver sendo gerado, retorna o pacote inicial limpo
+      // Se a conexão falhar ou a CDN estiver fora do ar, preserva o último snapshot válido
       if (cached) {
         return { success: true, data: cached.data };
+      }
+      try {
+        const dbSnapshot = await getElectionSnapshotFromDb(cacheKey);
+        if (dbSnapshot && dbSnapshot.candidates && dbSnapshot.candidates.length > 0) {
+          tseCache.set(cacheKey, { data: dbSnapshot, timestamp: now });
+          return { success: true, data: dbSnapshot };
+        }
+      } catch {
+        // ignora erro do DB
       }
       const emptyData = createEmptyTsePackage(targetUf);
       return {
@@ -466,6 +484,15 @@ export async function fetchLiveRegionData(
       ano: 2026
     };
 
+    if (consolidatedCandidates.length === 0) {
+      if (cached) return { success: true, data: cached.data };
+      const dbSnap = await getElectionSnapshotFromDb(cacheKey);
+      if (dbSnap && dbSnap.candidates && dbSnap.candidates.length > 0) {
+        tseCache.set(cacheKey, { data: dbSnap, timestamp: now });
+        return { success: true, data: dbSnap };
+      }
+    }
+
     const pkg: ElectionDataPackage = {
       cargo: 'PRESIDENTE',
       uf: 'BR',
@@ -476,12 +503,18 @@ export async function fetchLiveRegionData(
     };
 
     tseCache.set(cacheKey, { data: pkg, timestamp: now });
+    saveElectionSnapshotToDb(cacheKey, pkg).catch(() => {});
 
     return { success: true, data: pkg };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     if (cached) {
       return { success: true, data: cached.data };
+    }
+    const dbSnap = await getElectionSnapshotFromDb(cacheKey);
+    if (dbSnap && dbSnap.candidates && dbSnap.candidates.length > 0) {
+      tseCache.set(cacheKey, { data: dbSnap, timestamp: now });
+      return { success: true, data: dbSnap };
     }
     const empty = createEmptyTsePackage('BR');
     return { success: true, data: empty, error: errorMsg };
@@ -611,55 +644,78 @@ export function prefetchLiveRegionData(region: Region): void {
 /**
  * Panorama oficial dos 27 estados na eleição PRESIDENCIAL de 2º Turno 2026 extraído diretamente da CDN do TSE
  */
+export const STATES_SUMMARY_DB_KEY = 'tse_president_states_summary_v1';
+
 export async function fetchPresidentStatesSummaryList(): Promise<PresidentStateSummary[]> {
   const ufs = (Object.keys(UFS_INFO) as UF[]).filter((u) => u !== 'BR');
 
-  // Busca dados de todas as 27 UFs em paralelo na CDN do TSE
-  const results = await Promise.all(
-    ufs.map(async (uf) => {
-      const ufInfo = UFS_INFO[uf];
-      try {
-        const res = await fetchLiveTseData(uf, 'PRESIDENTE');
-        if (res.success && res.data && res.data.candidates.length >= 2) {
-          const leader = res.data.candidates[0];
-          const second = res.data.candidates[1];
-          return {
-            uf,
-            ufNome: ufInfo?.nome || uf,
-            pst: res.data.stats.pst,
-            leader,
-            second,
-            status: (res.data.stats.pst >= 95 && leader.pvap > 50) ? ('ELEITO' as const) : ('EM APURAÇÃO' as const)
-          };
+  try {
+    // Busca dados de todas as 27 UFs em paralelo na CDN do TSE
+    const results = await Promise.all(
+      ufs.map(async (uf) => {
+        const ufInfo = UFS_INFO[uf];
+        try {
+          const res = await fetchLiveTseData(uf, 'PRESIDENTE');
+          if (res.success && res.data && res.data.candidates.length >= 2) {
+            const leader = res.data.candidates[0];
+            const second = res.data.candidates[1];
+            return {
+              uf,
+              ufNome: ufInfo?.nome || uf,
+              pst: res.data.stats.pst,
+              leader,
+              second,
+              status: (res.data.stats.pst >= 95 && leader.pvap > 50) ? ('ELEITO' as const) : ('EM APURAÇÃO' as const)
+            };
+          }
+        } catch {
+          // Ignora erro individual
         }
-      } catch {
-        // Ignora erro individual
-      }
 
-      // Estado padrão caso o TSE ainda não tenha respondido essa UF
-      const placeholderCand: Candidate = {
-        n: '--',
-        nm: 'AGUARDANDO',
-        partido: '--',
-        cc: '',
-        vap: 0,
-        pvap: 0,
-        st: 'EM APURAÇÃO',
-        avatar: ''
-      };
+        // Estado padrão caso o TSE ainda não tenha respondido essa UF
+        const placeholderCand: Candidate = {
+          n: '--',
+          nm: 'AGUARDANDO',
+          partido: '--',
+          cc: '',
+          vap: 0,
+          pvap: 0,
+          st: 'EM APURAÇÃO',
+          avatar: ''
+        };
 
-      return {
-        uf,
-        ufNome: ufInfo?.nome || uf,
-        pst: 0.0,
-        leader: placeholderCand,
-        second: placeholderCand,
-        status: 'EM APURAÇÃO' as const
-      };
-    })
-  );
+        return {
+          uf,
+          ufNome: ufInfo?.nome || uf,
+          pst: 0.0,
+          leader: placeholderCand,
+          second: placeholderCand,
+          status: 'EM APURAÇÃO' as const
+        };
+      })
+    );
 
-  return results;
+    // Se temos UFs com dados reais, atualiza o snapshot persistente no IndexedDB
+    const validCount = results.filter((r) => r.leader && r.leader.nm !== 'AGUARDANDO').length;
+    if (validCount > 0) {
+      saveGenericDataToDb(STATES_SUMMARY_DB_KEY, results).catch(() => {});
+      return results;
+    }
+
+    // Se a CDN falhou para todos os estados, recupera o snapshot do IndexedDB para não deixar a tela vazia
+    const dbSnap = await getGenericDataFromDb<PresidentStateSummary[]>(STATES_SUMMARY_DB_KEY);
+    if (dbSnap && dbSnap.length > 0) {
+      return dbSnap;
+    }
+
+    return results;
+  } catch {
+    const dbSnap = await getGenericDataFromDb<PresidentStateSummary[]>(STATES_SUMMARY_DB_KEY);
+    if (dbSnap && dbSnap.length > 0) {
+      return dbSnap;
+    }
+    return [];
+  }
 }
 
 export async function fetchGovernorsSummaryList(): Promise<GovernorStateSummary[]> {

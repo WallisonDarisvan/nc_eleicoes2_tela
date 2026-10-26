@@ -24,7 +24,10 @@ FROM nginx:alpine
 # Remove configuração padrão do Nginx
 RUN rm -rf /etc/nginx/conf.d/default.conf
 
-# Copia configuração otimizada com suporte a SPA, Gzip e Proxy da CDN do TSE
+# Cria diretório de cache do TSE e ajusta permissões para persistência online
+RUN mkdir -p /var/cache/nginx/tse && chown -R nginx:nginx /var/cache/nginx/tse
+
+# Copia configuração otimizada com suporte a SPA, Gzip e Proxy da CDN do TSE com Cache Online
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copia os arquivos compilados do estágio de build
